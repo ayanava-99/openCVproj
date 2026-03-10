@@ -2,7 +2,7 @@ import streamlit as st
 import cv2
 import av
 from ultralytics import YOLO
-from streamlit_webrtc import webrtc_streamer
+from streamlit_webrtc import webrtc_streamer, RTCConfiguration
 
 # Set page config
 st.set_page_config(page_title="YOLOv8 Live Object Detection", page_icon="📷", layout="centered")
@@ -33,8 +33,15 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     # Return the processed frame
     return av.VideoFrame.from_ndarray(res_plotted, format="bgr24")
 
+# Configure STUN server for Streamlit Cloud deployment
+RTC_CONFIGURATION = RTCConfiguration(
+    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+)
+
 webrtc_streamer(
     key="example",
     video_frame_callback=video_frame_callback,
+    rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={"video": True, "audio": False},
+    async_processing=True,
 )
