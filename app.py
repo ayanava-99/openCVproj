@@ -1,14 +1,13 @@
 import streamlit as st
 import cv2
-import numpy as np
-from PIL import Image
 from ultralytics import YOLO
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 # Set page config
-st.set_page_config(page_title="YOLOv8 Object Detection", page_icon="📷", layout="centered")
+st.set_page_config(page_title="YOLOv8 Live Object Detection", page_icon="📷", layout="centered")
 
-st.title("📷 Real-Time Object Detection")
-st.write("Take a picture to detect objects using YOLOv8 Nano.")
+st.title("📷 Live Real-Time Object Detection")
+st.write("Turn on your webcam to detect objects live using YOLOv8 Nano.")
 
 # Load the YOLO model (cached so it doesn't reload on every interaction)
 @st.cache_resource
@@ -19,34 +18,27 @@ def load_model():
 
 model = load_model()
 
-# Camera input
-picture = st.camera_input("Take a picture!")
+class VideoTransformer(VideoTransformerBase):
+    def __init__(self):
+        self.model = model
 
-if picture is not None:
-    # Convert the file to a PIL image
-    image = Image.open(picture)
-    
-    with st.spinner('Detecting objects...'):
+    def transform(self, frame):
+        # Convert frame to numpy array
+        img = frame.to_ndarray(format="bgr24")
+
         # Run inference
-        results = model(image)
+        results = self.model(img)
         
         # Plot the results on the image (returns a BGR numpy array)
         res_plotted = results[0].plot()
-        
-        # Convert BGR to RGB for Streamlit
-        res_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
-        
-        # Display the output image
-        st.image(res_rgb, caption='Detected Objects', use_container_width=True)
-        
-        # Display detection text
-        st.subheader("Detections:")
-        
-        if len(results[0].boxes) == 0:
-            st.write("No objects detected.")
-        else:
-            for box in results[0].boxes:
-                class_id = int(box.cls[0])
-                class_name = model.names[class_id]
-                conf = float(box.conf[0])
-                st.write(f"- **{class_name}** (Confidence: {conf:.2f})")
+
+        return res_plotted
+
+webrtc_ctx = webrtc_streamer(
+    key="example",
+    video_transformer_factory=VideoTransformer,
+    media_stream_constraints={"video": True, "audio": False},
+)
+
+if webrtc_ctx.state.playing:
+    st.write("Webcam is active. Look out for detections!")
