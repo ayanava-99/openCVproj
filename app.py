@@ -1,7 +1,8 @@
 import streamlit as st
 import cv2
+import av
 from ultralytics import YOLO
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+from streamlit_webrtc import webrtc_streamer
 
 # Set page config
 st.set_page_config(page_title="YOLOv8 Live Object Detection", page_icon="📷", layout="centered")
@@ -18,27 +19,22 @@ def load_model():
 
 model = load_model()
 
-class VideoTransformer(VideoTransformerBase):
-    def __init__(self):
-        self.model = model
+# The callback function for streamlit-webrtc to process video frames
+def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
+    # Convert frame to numpy array
+    img = frame.to_ndarray(format="bgr24")
 
-    def transform(self, frame):
-        # Convert frame to numpy array
-        img = frame.to_ndarray(format="bgr24")
+    # Run inference
+    results = model(img)
+    
+    # Plot the results on the image (returns a BGR numpy array)
+    res_plotted = results[0].plot()
 
-        # Run inference
-        results = self.model(img)
-        
-        # Plot the results on the image (returns a BGR numpy array)
-        res_plotted = results[0].plot()
+    # Return the processed frame
+    return av.VideoFrame.from_ndarray(res_plotted, format="bgr24")
 
-        return res_plotted
-
-webrtc_ctx = webrtc_streamer(
+webrtc_streamer(
     key="example",
-    video_transformer_factory=VideoTransformer,
+    video_frame_callback=video_frame_callback,
     media_stream_constraints={"video": True, "audio": False},
 )
-
-if webrtc_ctx.state.playing:
-    st.write("Webcam is active. Look out for detections!")
